@@ -1,0 +1,158 @@
+-- ============================================
+-- ПРОЕКТ БАЗА ДАННИ - МАГАЗИН
+-- DDL КОМАНДИ (Data Definition Language)
+-- ============================================
+
+-- Изтриване на таблиците ако съществуват (за тестване)
+DROP TABLE IF EXISTS sale CASCADE;
+DROP TABLE IF EXISTS product CASCADE;
+DROP TABLE IF EXISTS product_group CASCADE;
+DROP TABLE IF EXISTS employee CASCADE;
+DROP TABLE IF EXISTS client CASCADE;
+
+-- ============================================
+-- 1. ТАБЛИЦА: PRODUCT_GROUP (Група продукти)
+-- ============================================
+CREATE TABLE product_group (
+    group_id NUMBER(10) PRIMARY KEY,
+    group_name VARCHAR2(100) NOT NULL UNIQUE
+);
+
+-- Коментари за документация
+COMMENT ON TABLE product_group IS 'Групи продукти (електроника, дрехи, храна и т.н.)';
+COMMENT ON COLUMN product_group.group_id IS 'Уникален идентификатор на групата';
+COMMENT ON COLUMN product_group.group_name IS 'Наименование на групата';
+
+-- ============================================
+-- 2. ТАБЛИЦА: PRODUCT (Продукт)
+-- ============================================
+CREATE TABLE product (
+    product_id NUMBER(10) PRIMARY KEY,
+    product_name VARCHAR2(200) NOT NULL,
+    group_id NUMBER(10) NOT NULL,
+    price NUMBER(10, 2) NOT NULL CHECK (price >= 0),
+    CONSTRAINT fk_product_group 
+        FOREIGN KEY (group_id) 
+        REFERENCES product_group(group_id)
+        ON DELETE RESTRICT
+);
+
+-- Индекси за по-бързо търсене
+CREATE INDEX idx_product_name ON product(product_name);
+CREATE INDEX idx_product_group ON product(group_id);
+CREATE INDEX idx_product_price ON product(price);
+
+-- Коментари
+COMMENT ON TABLE product IS 'Продукти в магазина';
+COMMENT ON COLUMN product.product_id IS 'Уникален идентификатор на продукта';
+COMMENT ON COLUMN product.product_name IS 'Наименование на продукта';
+COMMENT ON COLUMN product.group_id IS 'Връзка към групата на продукта';
+COMMENT ON COLUMN product.price IS 'Текуща цена на продукта';
+
+-- ============================================
+-- 3. ТАБЛИЦА: EMPLOYEE (Служител)
+-- ============================================
+CREATE TABLE employee (
+    employee_id NUMBER(10) PRIMARY KEY,
+    employee_name VARCHAR2(200) NOT NULL,
+    position VARCHAR2(100) NOT NULL,
+    phone VARCHAR2(20) NOT NULL
+);
+
+-- Индекс за търсене по име
+CREATE INDEX idx_employee_name ON employee(employee_name);
+
+-- Коментари
+COMMENT ON TABLE employee IS 'Служители в магазина';
+COMMENT ON COLUMN employee.employee_id IS 'Уникален идентификатор на служителя';
+COMMENT ON COLUMN employee.employee_name IS 'Име на служителя';
+COMMENT ON COLUMN employee.position IS 'Позиция/Длъжност';
+COMMENT ON COLUMN employee.phone IS 'Телефон за връзка';
+
+-- ============================================
+-- 4. ТАБЛИЦА: CLIENT (Клиент)
+-- ============================================
+CREATE TABLE client (
+    client_id NUMBER(10) PRIMARY KEY,
+    client_name VARCHAR2(200) NOT NULL,
+    phone VARCHAR2(20) NOT NULL
+);
+
+-- Индекс за търсене по име
+CREATE INDEX idx_client_name ON client(client_name);
+
+-- Коментари
+COMMENT ON TABLE client IS 'Клиенти на магазина';
+COMMENT ON COLUMN client.client_id IS 'Уникален идентификатор на клиента';
+COMMENT ON COLUMN client.client_name IS 'Име на клиента';
+COMMENT ON COLUMN client.phone IS 'Телефон за връзка';
+
+-- ============================================
+-- 5. ТАБЛИЦА: SALE (Продажба)
+-- ============================================
+CREATE TABLE sale (
+    sale_id NUMBER(10) PRIMARY KEY,
+    product_id NUMBER(10) NOT NULL,
+    client_id NUMBER(10) NOT NULL,
+    employee_id NUMBER(10) NOT NULL,
+    sale_date DATE NOT NULL,
+    sale_price NUMBER(10, 2) NOT NULL CHECK (sale_price >= 0),
+    CONSTRAINT fk_sale_product 
+        FOREIGN KEY (product_id) 
+        REFERENCES product(product_id)
+        ON DELETE RESTRICT,
+    CONSTRAINT fk_sale_client 
+        FOREIGN KEY (client_id) 
+        REFERENCES client(client_id)
+        ON DELETE RESTRICT,
+    CONSTRAINT fk_sale_employee 
+        FOREIGN KEY (employee_id) 
+        REFERENCES employee(employee_id)
+        ON DELETE RESTRICT
+);
+
+-- Индекси за оптимизация на справките
+CREATE INDEX idx_sale_date ON sale(sale_date);
+CREATE INDEX idx_sale_product ON sale(product_id);
+CREATE INDEX idx_sale_client ON sale(client_id);
+CREATE INDEX idx_sale_employee ON sale(employee_id);
+
+-- Коментари
+COMMENT ON TABLE sale IS 'Продажби в магазина';
+COMMENT ON COLUMN sale.sale_id IS 'Уникален идентификатор на продажбата';
+COMMENT ON COLUMN sale.product_id IS 'Продукт който е продаден';
+COMMENT ON COLUMN sale.client_id IS 'Клиент който е закупил';
+COMMENT ON COLUMN sale.employee_id IS 'Служител който е обслужил';
+COMMENT ON COLUMN sale.sale_date IS 'Дата на продажбата';
+COMMENT ON COLUMN sale.sale_price IS 'Цена към момента на продажбата';
+
+-- ============================================
+-- SEQUENCES за автоматично генериране на ID-та
+-- ============================================
+CREATE SEQUENCE seq_product_group START WITH 1 INCREMENT BY 1;
+CREATE SEQUENCE seq_product START WITH 1 INCREMENT BY 1;
+CREATE SEQUENCE seq_employee START WITH 1 INCREMENT BY 1;
+CREATE SEQUENCE seq_client START WITH 1 INCREMENT BY 1;
+CREATE SEQUENCE seq_sale START WITH 1 INCREMENT BY 1;
+
+-- ============================================
+-- ИЗГЛЕД (VIEW) за полезна информация
+-- ============================================
+CREATE OR REPLACE VIEW v_sale_details AS
+SELECT 
+    s.sale_id,
+    s.sale_date,
+    p.product_name,
+    pg.group_name,
+    c.client_name,
+    c.phone AS client_phone,
+    e.employee_name,
+    e.position AS employee_position,
+    s.sale_price
+FROM sale s
+JOIN product p ON s.product_id = p.product_id
+JOIN product_group pg ON p.group_id = pg.group_id
+JOIN client c ON s.client_id = c.client_id
+JOIN employee e ON s.employee_id = e.employee_id;
+
+COMMENT ON VIEW v_sale_details IS 'Детайлен изглед на всички продажби с пълна информация';
