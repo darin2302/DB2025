@@ -71,7 +71,8 @@ CREATE TABLE employee (
     employee_id NUMBER(10) PRIMARY KEY,
     employee_name VARCHAR2(200) NOT NULL,
     position_id NUMBER(10) NOT NULL,
-    phone VARCHAR2(20) NOT NULL,
+    phone VARCHAR2(20) NOT NULL UNIQUE
+        CHECK (REGEXP_LIKE(phone, '^\+?[0-9]{10,15}$')),
     CONSTRAINT fk_employee_position 
         FOREIGN KEY (position_id) 
         REFERENCES position(position_id)
@@ -87,7 +88,7 @@ COMMENT ON TABLE employee IS 'Служители в магазина';
 COMMENT ON COLUMN employee.employee_id IS 'Уникален идентификатор на служителя';
 COMMENT ON COLUMN employee.employee_name IS 'Име на служителя';
 COMMENT ON COLUMN employee.position_id IS 'Връзка към длъжността на служителя';
-COMMENT ON COLUMN employee.phone IS 'Телефон за връзка';
+COMMENT ON COLUMN employee.phone IS 'Телефон за връзка (уникален, формат: +XXXXXXXXXXXX)';
 
 -- ============================================
 -- 5. ТАБЛИЦА: CLIENT (Клиент)
@@ -95,7 +96,8 @@ COMMENT ON COLUMN employee.phone IS 'Телефон за връзка';
 CREATE TABLE client (
     client_id NUMBER(10) PRIMARY KEY,
     client_name VARCHAR2(200) NOT NULL,
-    phone VARCHAR2(20) NOT NULL
+    phone VARCHAR2(20) NOT NULL UNIQUE
+        CHECK (REGEXP_LIKE(phone, '^\+?[0-9]{10,15}$'))
 );
 
 -- Индекс за търсене по име
@@ -105,7 +107,7 @@ CREATE INDEX idx_client_name ON client(client_name);
 COMMENT ON TABLE client IS 'Клиенти на магазина';
 COMMENT ON COLUMN client.client_id IS 'Уникален идентификатор на клиента';
 COMMENT ON COLUMN client.client_name IS 'Име на клиента';
-COMMENT ON COLUMN client.phone IS 'Телефон за връзка';
+COMMENT ON COLUMN client.phone IS 'Телефон за връзка (уникален, формат: +XXXXXXXXXXXX)';
 
 -- ============================================
 -- 6. ТАБЛИЦА: SALE (Продажба - заглавна част)
@@ -153,7 +155,9 @@ CREATE TABLE sale_item (
     CONSTRAINT fk_sale_item_product 
         FOREIGN KEY (product_id) 
         REFERENCES product(product_id)
-        ON DELETE RESTRICT
+        ON DELETE RESTRICT,
+    -- Предотвратява дублиране на продукт в една продажба
+    CONSTRAINT uq_sale_product UNIQUE (sale_id, product_id)
 );
 
 -- Индекси за оптимизация
@@ -178,6 +182,27 @@ CREATE SEQUENCE seq_employee START WITH 1 INCREMENT BY 1;
 CREATE SEQUENCE seq_client START WITH 1 INCREMENT BY 1;
 CREATE SEQUENCE seq_sale START WITH 1 INCREMENT BY 1;
 CREATE SEQUENCE seq_sale_item START WITH 1 INCREMENT BY 1;
+
+-- ============================================
+-- ТРИГЕР: Предотвратява изтриване на последния артикул от продажба
+-- (Гарантира, че всяка продажба има поне един артикул)
+-- ============================================
+CREATE OR REPLACE TRIGGER trg_prevent_empty_sale
+BEFORE DELETE ON sale_item
+FOR EACH ROW
+DECLARE
+    v_count NUMBER;
+BEGIN
+    SELECT COUNT(*) INTO v_count
+    FROM sale_item
+    WHERE sale_id = :OLD.sale_id;
+    
+    IF v_count <= 1 THEN
+        RAISE_APPLICATION_ERROR(-20001, 
+            'Не може да се изтрие последният артикул от продажба. Изтрийте цялата продажба вместо това.');
+    END IF;
+END;
+/
 
 -- ============================================
 -- ИЗГЛЕД (VIEW) за полезна информация
