@@ -4,6 +4,7 @@
 -- ============================================
 
 -- Изтриване на таблиците ако съществуват (за тестване)
+DROP TABLE IF EXISTS sale_item CASCADE;
 DROP TABLE IF EXISTS sale CASCADE;
 DROP TABLE IF EXISTS product CASCADE;
 DROP TABLE IF EXISTS product_group CASCADE;
@@ -107,19 +108,13 @@ COMMENT ON COLUMN client.client_name IS 'Име на клиента';
 COMMENT ON COLUMN client.phone IS 'Телефон за връзка';
 
 -- ============================================
--- 6. ТАБЛИЦА: SALE (Продажба)
+-- 6. ТАБЛИЦА: SALE (Продажба - заглавна част)
 -- ============================================
 CREATE TABLE sale (
     sale_id NUMBER(10) PRIMARY KEY,
-    product_id NUMBER(10) NOT NULL,
     client_id NUMBER(10) NOT NULL,
     employee_id NUMBER(10) NOT NULL,
     sale_date DATE NOT NULL,
-    sale_price NUMBER(10, 2) NOT NULL CHECK (sale_price >= 0),
-    CONSTRAINT fk_sale_product 
-        FOREIGN KEY (product_id) 
-        REFERENCES product(product_id)
-        ON DELETE RESTRICT,
     CONSTRAINT fk_sale_client 
         FOREIGN KEY (client_id) 
         REFERENCES client(client_id)
@@ -132,18 +127,46 @@ CREATE TABLE sale (
 
 -- Индекси за оптимизация на справките
 CREATE INDEX idx_sale_date ON sale(sale_date);
-CREATE INDEX idx_sale_product ON sale(product_id);
 CREATE INDEX idx_sale_client ON sale(client_id);
 CREATE INDEX idx_sale_employee ON sale(employee_id);
 
 -- Коментари
-COMMENT ON TABLE sale IS 'Продажби в магазина';
+COMMENT ON TABLE sale IS 'Продажби в магазина (заглавна информация)';
 COMMENT ON COLUMN sale.sale_id IS 'Уникален идентификатор на продажбата';
-COMMENT ON COLUMN sale.product_id IS 'Продукт който е продаден';
 COMMENT ON COLUMN sale.client_id IS 'Клиент който е закупил';
 COMMENT ON COLUMN sale.employee_id IS 'Служител който е обслужил';
 COMMENT ON COLUMN sale.sale_date IS 'Дата на продажбата';
-COMMENT ON COLUMN sale.sale_price IS 'Цена към момента на продажбата';
+
+-- ============================================
+-- 7. ТАБЛИЦА: SALE_ITEM (Артикули в продажба)
+-- ============================================
+CREATE TABLE sale_item (
+    sale_item_id NUMBER(10) PRIMARY KEY,
+    sale_id NUMBER(10) NOT NULL,
+    product_id NUMBER(10) NOT NULL,
+    quantity NUMBER(10) NOT NULL CHECK (quantity > 0),
+    unit_price NUMBER(10, 2) NOT NULL CHECK (unit_price >= 0),
+    CONSTRAINT fk_sale_item_sale 
+        FOREIGN KEY (sale_id) 
+        REFERENCES sale(sale_id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_sale_item_product 
+        FOREIGN KEY (product_id) 
+        REFERENCES product(product_id)
+        ON DELETE RESTRICT
+);
+
+-- Индекси за оптимизация
+CREATE INDEX idx_sale_item_sale ON sale_item(sale_id);
+CREATE INDEX idx_sale_item_product ON sale_item(product_id);
+
+-- Коментари
+COMMENT ON TABLE sale_item IS 'Артикули (редове) в продажба';
+COMMENT ON COLUMN sale_item.sale_item_id IS 'Уникален идентификатор на реда';
+COMMENT ON COLUMN sale_item.sale_id IS 'Връзка към продажбата';
+COMMENT ON COLUMN sale_item.product_id IS 'Продукт който е продаден';
+COMMENT ON COLUMN sale_item.quantity IS 'Количество';
+COMMENT ON COLUMN sale_item.unit_price IS 'Единична цена към момента на продажбата';
 
 -- ============================================
 -- SEQUENCES за автоматично генериране на ID-та
@@ -154,6 +177,7 @@ CREATE SEQUENCE seq_position START WITH 1 INCREMENT BY 1;
 CREATE SEQUENCE seq_employee START WITH 1 INCREMENT BY 1;
 CREATE SEQUENCE seq_client START WITH 1 INCREMENT BY 1;
 CREATE SEQUENCE seq_sale START WITH 1 INCREMENT BY 1;
+CREATE SEQUENCE seq_sale_item START WITH 1 INCREMENT BY 1;
 
 -- ============================================
 -- ИЗГЛЕД (VIEW) за полезна информация
@@ -162,18 +186,41 @@ CREATE OR REPLACE VIEW v_sale_details AS
 SELECT 
     s.sale_id,
     s.sale_date,
-    p.product_name,
-    pg.group_name,
     c.client_name,
     c.phone AS client_phone,
     e.employee_name,
     pos.position_name AS employee_position,
-    s.sale_price
+    p.product_name,
+    pg.group_name,
+    si.quantity,
+    si.unit_price,
+    (si.quantity * si.unit_price) AS line_total
 FROM sale s
-JOIN product p ON s.product_id = p.product_id
-JOIN product_group pg ON p.group_id = pg.group_id
 JOIN client c ON s.client_id = c.client_id
 JOIN employee e ON s.employee_id = e.employee_id
-JOIN position pos ON e.position_id = pos.position_id;
+JOIN position pos ON e.position_id = pos.position_id
+JOIN sale_item si ON s.sale_id = si.sale_id
+JOIN product p ON si.product_id = p.product_id
+JOIN product_group pg ON p.group_id = pg.group_id;
 
 COMMENT ON VIEW v_sale_details IS 'Детайлен изглед на всички продажби с пълна информация';
+
+-- ============================================
+-- ИЗГЛЕД (VIEW) за обобщение на продажби
+-- ============================================
+CREATE OR REPLACE VIEW v_sale_summary AS
+SELECT 
+    s.sale_id,
+    s.sale_date,
+    c.client_name,
+    e.employee_name,
+    COUNT(si.sale_item_id) AS items_count,
+    SUM(si.quantity) AS total_quantity,
+    SUM(si.quantity * si.unit_price) AS total_amount
+FROM sale s
+JOIN client c ON s.client_id = c.client_id
+JOIN employee e ON s.employee_id = e.employee_id
+JOIN sale_item si ON s.sale_id = si.sale_id
+GROUP BY s.sale_id, s.sale_date, c.client_name, e.employee_name;
+
+COMMENT ON VIEW v_sale_summary IS 'Обобщен изглед на продажби с общи суми';

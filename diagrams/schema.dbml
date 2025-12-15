@@ -1,0 +1,87 @@
+// ПРОЕКТ БАЗА ДАННИ - МАГАЗИН
+// Database Schema for dbdiagram.io
+
+Table product_group {
+  group_id int [pk]
+  group_name varchar(100) [not null, unique, note: 'Наименование на групата']
+  
+  Note: 'Групи продукти (електроника, дрехи, храна и т.н.)'
+}
+
+Table product {
+  product_id int [pk]
+  product_name varchar(200) [not null, note: 'Наименование на продукта']
+  group_id int [not null, ref: > product_group.group_id]
+  price decimal(10,2) [not null, note: 'Текуща цена на продукта']
+  
+  Note: 'Продукти в магазина'
+  
+  indexes {
+    product_name [name: 'idx_product_name']
+    group_id [name: 'idx_product_group']
+    price [name: 'idx_product_price']
+  }
+}
+
+Table position {
+  position_id int [pk]
+  position_name varchar(100) [not null, unique, note: 'Наименование на длъжността']
+  
+  Note: 'Длъжности на служителите (мениджър, продавач, касиер и т.н.)'
+}
+
+Table employee {
+  employee_id int [pk]
+  employee_name varchar(200) [not null, note: 'Име на служителя']
+  position_id int [not null, ref: > position.position_id]
+  phone varchar(20) [not null, note: 'Телефон за връзка']
+  
+  Note: 'Служители в магазина'
+  
+  indexes {
+    employee_name [name: 'idx_employee_name']
+    position_id [name: 'idx_employee_position']
+  }
+}
+
+Table client {
+  client_id int [pk]
+  client_name varchar(200) [not null, note: 'Име на клиента']
+  phone varchar(20) [not null, note: 'Телефон за връзка']
+  
+  Note: 'Клиенти на магазина'
+  
+  indexes {
+    client_name [name: 'idx_client_name']
+  }
+}
+
+Table sale {
+  sale_id int [pk]
+  client_id int [not null, ref: > client.client_id]
+  employee_id int [not null, ref: > employee.employee_id]
+  sale_date date [not null, note: 'Дата на продажбата']
+  
+  Note: 'Продажби в магазина (заглавна информация)'
+  
+  indexes {
+    sale_date [name: 'idx_sale_date']
+    client_id [name: 'idx_sale_client']
+    employee_id [name: 'idx_sale_employee']
+  }
+}
+
+Table sale_item {
+  sale_item_id int [pk]
+  sale_id int [not null, ref: > sale.sale_id]
+  product_id int [not null, ref: > product.product_id]
+  quantity int [not null, note: 'Количество']
+  unit_price decimal(10,2) [not null, note: 'Единична цена към момента на продажбата']
+  
+  Note: 'Артикули (редове) в продажба'
+  
+  indexes {
+    sale_id [name: 'idx_sale_item_sale']
+    product_id [name: 'idx_sale_item_product']
+  }
+}

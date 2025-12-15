@@ -33,14 +33,16 @@ Kурс: **2**
 - **Продукт**: наименование, група, цена
 - **Служител**: име, позиция, телефон
 - **Клиент**: име, телефон
-- **Продажба**: продукт, клиент, служител, дата, цена
+- **Продажба**: продукти (множество), клиент, служител, дата, цени
 
 ### 1.2 Бизнес правила
 
 1. Всеки продукт принадлежи на **една** група
-2. Всеки клиент може да закупи **много** продукти
-3. Всеки служител може да обслужи **много** продажби
-4. Всяка продажба включва един продукт, един клиент и един служител
+2. Всеки служител заема **една** позиция/длъжност
+3. Всеки клиент може да закупи **много** продукти
+4. Всеки служител може да обслужи **много** продажби
+5. Всяка продажба може да включва **много** продукти (артикули)
+6. Всяка продажба включва един клиент и един служител
 
 ### 1.3 Функционални изисквания
 
@@ -76,10 +78,14 @@ Kурс: **2**
 - **group_id** (FK) - Връзка към група
 - **price** - Цена на продукта
 
+#### POSITION (Позиция/Длъжност)
+- **position_id** (PK) - Уникален идентификатор на позицията
+- **position_name** - Наименование на длъжността
+
 #### EMPLOYEE (Служител)
 - **employee_id** (PK) - Уникален идентификатор на служителя
 - **employee_name** - Име на служителя
-- **position** - Позиция/длъжност
+- **position_id** (FK) - Връзка към позиция/длъжност
 - **phone** - Телефон за връзка
 
 #### CLIENT (Клиент)
@@ -87,13 +93,18 @@ Kурс: **2**
 - **client_name** - Име на клиента
 - **phone** - Телефон за връзка
 
-#### SALE (Продажба)
+#### SALE (Продажба - заглавна част)
 - **sale_id** (PK) - Уникален идентификатор на продажбата
-- **product_id** (FK) - Връзка към продукт
 - **client_id** (FK) - Връзка към клиент
 - **employee_id** (FK) - Връзка към служител
 - **sale_date** - Дата на продажбата
-- **sale_price** - Цена към момента на продажбата
+
+#### SALE_ITEM (Артикул в продажба)
+- **sale_item_id** (PK) - Уникален идентификатор на реда
+- **sale_id** (FK) - Връзка към продажба
+- **product_id** (FK) - Връзка към продукт
+- **quantity** - Количество
+- **unit_price** - Единична цена към момента на продажбата
 
 ### 2.3 Релации
 
@@ -102,14 +113,22 @@ PRODUCT_GROUP (1) ────< (M) PRODUCT
    └─ Една група съдържа много продукти
    └─ Всеки продукт принадлежи на точно една група
 
-PRODUCT (1) ────< (M) SALE
-   └─ Един продукт може да бъде продаден много пъти
+POSITION (1) ────< (M) EMPLOYEE
+   └─ Една позиция може да бъде заемана от много служители
+   └─ Всеки служител заема точно една позиция
 
 CLIENT (1) ────< (M) SALE
    └─ Един клиент може да направи много покупки
 
 EMPLOYEE (1) ────< (M) SALE
    └─ Един служител може да обслужи много продажби
+
+SALE (1) ────< (M) SALE_ITEM
+   └─ Една продажба съдържа много артикули (редове)
+   └─ Всеки артикул принадлежи на точно една продажба
+
+PRODUCT (1) ────< (M) SALE_ITEM
+   └─ Един продукт може да бъде включен в много продажби
 ```
 
 ### 2.4 Кардиналност и участие
@@ -117,9 +136,11 @@ EMPLOYEE (1) ────< (M) SALE
 | Релация                | Кардиналност | Участие Parent | Участие Child |
 |------------------------|--------------|----------------|---------------|
 | PRODUCT_GROUP → PRODUCT| 1:M          | Частично       | Задължително  |
-| PRODUCT → SALE         | 1:M          | Частично       | Задължително  |
+| POSITION → EMPLOYEE    | 1:M          | Частично       | Задължително  |
 | CLIENT → SALE          | 1:M          | Частично       | Задължително  |
 | EMPLOYEE → SALE        | 1:M          | Частично       | Задължително  |
+| SALE → SALE_ITEM       | 1:M          | Задължително   | Задължително  |
+| PRODUCT → SALE_ITEM    | 1:M          | Частично       | Задължително  |
 
 ---
 
@@ -147,7 +168,9 @@ EMPLOYEE (1) ────< (M) SALE
 - Моделът е в 2NF
 - Няма транзитивни зависимости между неключови атрибути
 - Групата на продукта е изнесена в отделна таблица PRODUCT_GROUP
-- Цената на продажбата се запазва в SALE за исторически данни (защото цените могат да се променят във времето)
+- Позицията на служителя е изнесена в отделна таблица POSITION
+- Артикулите на продажбата са изнесени в отделна таблица SALE_ITEM
+- Цената на артикула се запазва в SALE_ITEM за исторически данни
 
 ### 3.2 Обосновка на дизайна
 
@@ -156,7 +179,19 @@ EMPLOYEE (1) ────< (M) SALE
 - Улеснява промяна на име на група (един UPDATE вместо много)
 - Позволява добавяне на допълнителна информация за групата в бъдеще
 
-**Защо sale_price се дублира в SALE?**
+**Защо POSITION е отделна таблица?**
+- Стандартизиране на длъжностите (избягване на несъответствия като "Продавач" vs "продавач")
+- Улеснява промяна на име на позиция (един UPDATE вместо много)
+- Позволява добавяне на допълнителна информация за позицията в бъдеще (напр. заплата, ниво)
+- Улеснява справки и филтриране по позиция
+
+**Защо SALE_ITEM е отделна таблица?**
+- Позволява една продажба да съдържа много продукти (кошница)
+- Всеки артикул има собствено количество и цена
+- Цената се запазва към момента на продажбата (исторически данни)
+- Улеснява анализ на продажби по продукт
+
+**Защо unit_price се дублира в SALE_ITEM?**
 - Исторически данни: цената на продукта може да се промени
 - Продажбата трябва да запази цената към момента на транзакцията
 - Позволява анализ на ценова политика във времето
@@ -202,17 +237,33 @@ CREATE INDEX idx_product_group ON product(group_id);
 CREATE INDEX idx_product_price ON product(price);
 ```
 
+#### Таблица POSITION
+
+```sql
+CREATE TABLE position (
+    position_id NUMBER(10) PRIMARY KEY,
+    position_name VARCHAR2(100) NOT NULL UNIQUE
+);
+
+COMMENT ON TABLE position IS 'Длъжности на служителите (мениджър, продавач, касиер и т.н.)';
+```
+
 #### Таблица EMPLOYEE
 
 ```sql
 CREATE TABLE employee (
     employee_id NUMBER(10) PRIMARY KEY,
     employee_name VARCHAR2(200) NOT NULL,
-    position VARCHAR2(100) NOT NULL,
-    phone VARCHAR2(20) NOT NULL
+    position_id NUMBER(10) NOT NULL,
+    phone VARCHAR2(20) NOT NULL,
+    CONSTRAINT fk_employee_position 
+        FOREIGN KEY (position_id) 
+        REFERENCES position(position_id)
+        ON DELETE RESTRICT
 );
 
 CREATE INDEX idx_employee_name ON employee(employee_name);
+CREATE INDEX idx_employee_position ON employee(position_id);
 ```
 
 #### Таблица CLIENT
@@ -232,24 +283,37 @@ CREATE INDEX idx_client_name ON client(client_name);
 ```sql
 CREATE TABLE sale (
     sale_id NUMBER(10) PRIMARY KEY,
-    product_id NUMBER(10) NOT NULL,
     client_id NUMBER(10) NOT NULL,
     employee_id NUMBER(10) NOT NULL,
     sale_date DATE NOT NULL,
-    sale_price NUMBER(10, 2) NOT NULL CHECK (sale_price >= 0),
-    CONSTRAINT fk_sale_product 
-        FOREIGN KEY (product_id) REFERENCES product(product_id) ON DELETE RESTRICT,
     CONSTRAINT fk_sale_client 
         FOREIGN KEY (client_id) REFERENCES client(client_id) ON DELETE RESTRICT,
     CONSTRAINT fk_sale_employee 
         FOREIGN KEY (employee_id) REFERENCES employee(employee_id) ON DELETE RESTRICT
 );
 
--- Индекси за оптимизация на заявките
 CREATE INDEX idx_sale_date ON sale(sale_date);
-CREATE INDEX idx_sale_product ON sale(product_id);
 CREATE INDEX idx_sale_client ON sale(client_id);
 CREATE INDEX idx_sale_employee ON sale(employee_id);
+```
+
+#### Таблица SALE_ITEM
+
+```sql
+CREATE TABLE sale_item (
+    sale_item_id NUMBER(10) PRIMARY KEY,
+    sale_id NUMBER(10) NOT NULL,
+    product_id NUMBER(10) NOT NULL,
+    quantity NUMBER(10) NOT NULL CHECK (quantity > 0),
+    unit_price NUMBER(10, 2) NOT NULL CHECK (unit_price >= 0),
+    CONSTRAINT fk_sale_item_sale 
+        FOREIGN KEY (sale_id) REFERENCES sale(sale_id) ON DELETE CASCADE,
+    CONSTRAINT fk_sale_item_product 
+        FOREIGN KEY (product_id) REFERENCES product(product_id) ON DELETE RESTRICT
+);
+
+CREATE INDEX idx_sale_item_sale ON sale_item(sale_id);
+CREATE INDEX idx_sale_item_product ON sale_item(product_id);
 ```
 
 ### 4.3 Constraints (Ограничения)
@@ -258,11 +322,16 @@ CREATE INDEX idx_sale_employee ON sale(employee_id);
 |-------------------|----------------|-----------------------------------------------|
 | PRIMARY KEY       | Всички         | Уникален идентификатор на всеки ред           |
 | FOREIGN KEY       | PRODUCT        | Връзка към PRODUCT_GROUP                      |
-| FOREIGN KEY       | SALE           | Връзки към PRODUCT, CLIENT, EMPLOYEE          |
+| FOREIGN KEY       | EMPLOYEE       | Връзка към POSITION                           |
+| FOREIGN KEY       | SALE           | Връзки към CLIENT, EMPLOYEE                   |
+| FOREIGN KEY       | SALE_ITEM      | Връзки към SALE, PRODUCT                      |
 | NOT NULL          | Всички         | Задължителни полета                           |
 | UNIQUE            | PRODUCT_GROUP  | Уникално име на група                         |
-| CHECK             | PRODUCT, SALE  | Цените не могат да бъдат отрицателни          |
-| ON DELETE RESTRICT| Всички FK      | Предотвратява изтриване при съществуващи връзки|
+| UNIQUE            | POSITION       | Уникално име на позиция                       |
+| CHECK             | PRODUCT        | Цената не може да бъде отрицателна            |
+| CHECK             | SALE_ITEM      | Количеството > 0, цената >= 0                 |
+| ON DELETE RESTRICT| Повечето FK    | Предотвратява изтриване при съществуващи връзки|
+| ON DELETE CASCADE | SALE_ITEM→SALE | Изтрива артикулите при изтриване на продажба  |
 
 ### 4.4 Sequences и Views
 
@@ -270,23 +339,42 @@ CREATE INDEX idx_sale_employee ON sale(employee_id);
 -- Автоматично генериране на ID-та
 CREATE SEQUENCE seq_product_group START WITH 1 INCREMENT BY 1;
 CREATE SEQUENCE seq_product START WITH 1 INCREMENT BY 1;
+CREATE SEQUENCE seq_position START WITH 1 INCREMENT BY 1;
 CREATE SEQUENCE seq_employee START WITH 1 INCREMENT BY 1;
 CREATE SEQUENCE seq_client START WITH 1 INCREMENT BY 1;
 CREATE SEQUENCE seq_sale START WITH 1 INCREMENT BY 1;
+CREATE SEQUENCE seq_sale_item START WITH 1 INCREMENT BY 1;
 
 -- View за детайлна информация за продажби
 CREATE OR REPLACE VIEW v_sale_details AS
 SELECT 
     s.sale_id, s.sale_date,
-    p.product_name, pg.group_name,
     c.client_name, c.phone AS client_phone,
-    e.employee_name, e.position AS employee_position,
-    s.sale_price
+    e.employee_name, pos.position_name AS employee_position,
+    p.product_name, pg.group_name,
+    si.quantity, si.unit_price,
+    (si.quantity * si.unit_price) AS line_total
 FROM sale s
-JOIN product p ON s.product_id = p.product_id
-JOIN product_group pg ON p.group_id = pg.group_id
 JOIN client c ON s.client_id = c.client_id
-JOIN employee e ON s.employee_id = e.employee_id;
+JOIN employee e ON s.employee_id = e.employee_id
+JOIN position pos ON e.position_id = pos.position_id
+JOIN sale_item si ON s.sale_id = si.sale_id
+JOIN product p ON si.product_id = p.product_id
+JOIN product_group pg ON p.group_id = pg.group_id;
+
+-- View за обобщение на продажби
+CREATE OR REPLACE VIEW v_sale_summary AS
+SELECT 
+    s.sale_id, s.sale_date,
+    c.client_name, e.employee_name,
+    COUNT(si.sale_item_id) AS items_count,
+    SUM(si.quantity) AS total_quantity,
+    SUM(si.quantity * si.unit_price) AS total_amount
+FROM sale s
+JOIN client c ON s.client_id = c.client_id
+JOIN employee e ON s.employee_id = e.employee_id
+JOIN sale_item si ON s.sale_id = si.sale_id
+GROUP BY s.sale_id, s.sale_date, c.client_name, e.employee_name;
 ```
 
 ---
@@ -299,9 +387,11 @@ JOIN employee e ON s.employee_id = e.employee_id;
 |----------------|-------------|-----------------------------------|
 | PRODUCT_GROUP  | 6           | Категории продукти                |
 | PRODUCT        | 30          | Различни продукти                 |
+| POSITION       | 4           | Длъжности на служителите          |
 | EMPLOYEE       | 5           | Служители на магазина             |
 | CLIENT         | 10          | Регистрирани клиенти              |
-| SALE           | 30          | Продажби за период 5 месеца       |
+| SALE           | 25          | Продажби за период 5 месеца       |
+| SALE_ITEM      | 47          | Артикули в продажбите             |
 
 ### 5.2 Групи продукти
 
@@ -312,7 +402,16 @@ JOIN employee e ON s.employee_id = e.employee_id;
 5. **Книги** - Литература и учебници
 6. **Спортни стоки** - Спортно оборудване
 
-### 5.3 Примерни продукти (извадка)
+### 5.3 Позиции/Длъжности
+
+| ID | Позиция          | Описание                                    |
+|----|------------------|---------------------------------------------|
+| 1  | Мениджър         | Управлява магазина и персонала              |
+| 2  | Продавач         | Обслужва клиенти и извършва продажби        |
+| 3  | Старши продавач  | Опитен продавач с допълнителни отговорности |
+| 4  | Касиер           | Обработва плащания на касата                |
+
+### 5.4 Примерни продукти (извадка)
 
 | ID | Продукт                    | Група           | Цена (лв) |
 |----|----------------------------|-----------------|-----------|
@@ -323,7 +422,7 @@ JOIN employee e ON s.employee_id = e.employee_id;
 | 12 | Шоколад Milka 100г         | Храна и напитки | 2.49      |
 | 29 | Велосипед Trek Mountain    | Спортни стоки   | 899.00    |
 
-### 5.4 Служители
+### 5.5 Служители
 
 | ID | Име                  | Позиция          | Телефон        |
 |----|----------------------|------------------|----------------|
@@ -333,12 +432,23 @@ JOIN employee e ON s.employee_id = e.employee_id;
 | 4  | Елена Иванова        | Старши продавач  | +359888444555  |
 | 5  | Петър Георгиев       | Касиер           | +359888555666  |
 
-### 5.5 Период на данните
+### 5.6 Примерна продажба (кошница)
+
+**Продажба #1** (05.01.2024, Клиент: Анна Николова, Служител: Мария Димитрова)
+
+| Продукт                    | Количество | Ед. цена | Сума      |
+|----------------------------|------------|----------|-----------|
+| Лаптоп Dell XPS 15         | 1          | 2,499.99 | 2,499.99  |
+| Мишка Logitech MX Master   | 1          | 99.99    | 99.99     |
+| **Общо:**                  | **2**      |          | **2,599.98** |
+
+### 5.7 Период на данните
 
 - **Начало:** 01.01.2024
 - **Край:** 31.05.2024
 - **Продължителност:** 5 месеца
-- **Брой транзакции:** 30
+- **Брой транзакции:** 25
+- **Брой артикули:** 47
 
 ---
 
@@ -346,25 +456,27 @@ JOIN employee e ON s.employee_id = e.employee_id;
 
 ### 6.1 DDL - Data Definition Language
 
-**Файл:** `02_ddl_create_tables.sql`
+**Файл:** `ddl_create_tables.sql`
 
 Съдържа:
-- `CREATE TABLE` за 5 таблици
-- 11 индекса за оптимизация
-- 5 sequences за автоматично генериране на ID
-- 1 view за детайлни справки
+- `CREATE TABLE` за 7 таблици
+- 14 индекса за оптимизация
+- 7 sequences за автоматично генериране на ID
+- 2 views за детайлни справки
 - Коментари на всички таблици и колони
 
 ### 6.2 DML - Data Manipulation Language
 
-**Файл:** `03_dml_sample_data.sql`
+**Файл:** `dml_sample_data.sql`
 
 **INSERT команди:**
 - 6 групи продукти
 - 30 продукта (по 5 от всяка група)
+- 4 позиции/длъжности
 - 5 служителя
 - 10 клиента
-- 30 продажби
+- 25 продажби
+- 47 артикула в продажбите
 
 **UPDATE и DELETE примери:**
 ```sql
@@ -374,21 +486,21 @@ UPDATE product SET price = 2399.99 WHERE product_id = 1;
 -- Промяна на телефон
 UPDATE employee SET phone = '+359888111333' WHERE employee_id = 1;
 
--- Изтриване (ако няма зависимости)
-DELETE FROM product WHERE product_id = 31;
+-- Изтриване на продажба (CASCADE изтрива и артикулите)
+DELETE FROM sale WHERE sale_id = 26;
 ```
 
 ### 6.3 DQL - Data Query Language
 
-**Файл:** `04_queries.sql`
+**Файл:** `queries.sql`
 
-Съдържа **18 заявки** организирани в 6 категории:
+Съдържа **24 заявки** организирани в 6 категории:
 1. Въвеждане и корекции (5 заявки)
 2. Търсене на продукти (5 заявки)
-3. Справки за продажби (5 заявки)
+3. Справки за продажби (6 заявки)
 4. Оборот по група (2 заявки)
 5. Топ продукти (3 заявки)
-6. Допълнителни анализи (7 заявки)
+6. Допълнителни анализи (12 заявки)
 
 ---
 
@@ -408,85 +520,44 @@ DELETE FROM product WHERE product_id = 31;
 | Крем Nivea Anti-Age           | 12.99     | Козметика       |
 | Под игото - Иван Вазов        | 15.00     | Книги           |
 
-### 7.2 Продажби за период (Q1 2024)
+### 7.2 Продажби за период - обобщение
 
 **Заявка:** Продажби от 01.01.2024 до 31.03.2024
 
-**Резултат:**
-- **Общо продажби:** 15
-- **Обща сума:** 6,873.45 лв
-- **Средна продажба:** 458.23 лв
+**Резултат (извадка):**
 
-**Примери (топ 5 по стойност):**
+| Дата       | Клиент          | Служител        | Артикули | Обща сума |
+|------------|-----------------|-----------------|----------|-----------|
+| 2024-01-05 | Анна Николова   | Мария Димитрова | 2        | 2,599.98  |
+| 2024-01-08 | Христо Василев  | Георги Стоянов  | 2        | 20.43     |
+| 2024-01-10 | Димитър Тодоров | Мария Димитрова | 3        | 244.98    |
 
-| Дата       | Продукт                  | Клиент          | Служител        | Цена (лв) |
-|------------|--------------------------|-----------------|-----------------|-----------|
-| 2024-01-05 | Лаптоп Dell XPS 15       | Анна Николова   | Мария Димитрова | 2,499.99  |
-| 2024-03-01 | Велосипед Trek Mountain  | Христо Василев  | Мария Димитрова | 899.00    |
-| 2024-03-05 | Таблет Samsung Galaxy    | Димитър Тодоров | Георги Стоянов  | 649.00    |
-| 2024-01-15 | Слушалки Sony WH-1000XM5 | Николай Костов  | Мария Димитрова | 399.99    |
-| 2024-03-15 | Яке Adidas Original      | Николай Костов  | Георги Стоянов  | 189.99    |
-
-### 7.3 Продажби за служител
-
-**Заявка:** Всички продажби на Мария Димитрова, подредени по дата
-
-**Резултат:**
-- **Брой продажби:** 8
-- **Общ оборот:** 7,833.93 лв
-- **Средна продажба:** 979.24 лв
-
-### 7.4 Продажби за клиент
-
-**Заявка:** Всички покупки на Анна Николова
-
-**Резултат:**
-- **Брой покупки:** 4
-- **Обща сума:** 4,414.47 лв
-- **Средна покупка:** 1,103.62 лв
-
-| Дата       | Продукт                  | Група           | Цена (лв) |
-|------------|--------------------------|-----------------|-----------|
-| 2024-01-05 | Лаптоп Dell XPS 15       | Електроника     | 2,499.99  |
-| 2024-02-02 | Смартфон iPhone 14       | Електроника     | 1,899.00  |
-| 2024-04-10 | Крем Nivea Anti-Age      | Козметика       | 12.99     |
-| 2024-05-16 | Шоколад Milka 100г       | Храна и напитки | 2.49      |
-
-### 7.5 Оборот и брой продажби по група
+### 7.3 Оборот и брой продажби по група
 
 **Заявка:** Статистика по групи за цяла 2024 г.
 
 **Резултат:**
 
-| Група           | Брой продажби | Оборот (лв) | Средна цена (лв) | % от оборота |
-|-----------------|---------------|-------------|------------------|--------------|
-| Електроника     | 9             | 10,447.93   | 1,160.88         | 46.8%        |
-| Спортни стоки   | 2             | 1,033.99    | 516.99           | 4.6%         |
-| Дрехи           | 4             | 484.97      | 121.24           | 2.2%         |
-| Козметика       | 4             | 211.98      | 52.99            | 0.9%         |
-| Храна и напитки | 8             | 111.96      | 14.00            | 0.5%         |
-| Книги           | 3             | 82.00       | 27.33            | 0.4%         |
+| Група           | Продажби | Продадени бр. | Оборот (лв) |
+|-----------------|----------|---------------|-------------|
+| Електроника     | 8        | 10            | 12,547.88   |
+| Спортни стоки   | 5        | 7             | 1,232.97    |
+| Дрехи           | 5        | 10            | 918.95      |
+| Козметика       | 4        | 8             | 330.93      |
+| Храна и напитки | 8        | 35            | 194.26      |
+| Книги           | 4        | 5             | 132.00      |
 
-**Общо:** 30 продажби на стойност **22,312.86 лв**
-
-### 7.6 Топ 10 продукти по оборот
-
-**Заявка:** Най-печеливши продукти за 2024 г.
+### 7.4 Топ 10 продукти по оборот
 
 **Резултат:**
 
-| # | Продукт                     | Група         | Брой | Оборот (лв) |
-|---|-----------------------------|---------------|------|-------------|
-| 1 | Лаптоп Dell XPS 15          | Електроника   | 2    | 4,999.98    |
-| 2 | Смартфон iPhone 14          | Електроника   | 2    | 3,798.00    |
-| 3 | Велосипед Trek Mountain     | Спортни стоки | 1    | 899.00      |
-| 4 | Слушалки Sony WH-1000XM5    | Електроника   | 2    | 799.98      |
-| 5 | Таблет Samsung Galaxy Tab   | Електроника   | 1    | 649.00      |
-| 6 | Яке Adidas Original         | Дрехи         | 1    | 189.99      |
-| 7 | Парфюм Chanel No.5          | Козметика     | 1    | 159.00      |
-| 8 | Скейтборд Element           | Спортни стоки | 1    | 149.00      |
-| 9 | Дънки Levi's 501            | Дрехи         | 1    | 129.99      |
-| 10| Обувки Puma Running         | Дрехи         | 1    | 119.00      |
+| # | Продукт                     | Група         | Бройки | Оборот (лв) |
+|---|-----------------------------|---------------|--------|-------------|
+| 1 | Лаптоп Dell XPS 15          | Електроника   | 2      | 4,999.98    |
+| 2 | Смартфон iPhone 14          | Електроника   | 1      | 1,899.00    |
+| 3 | Слушалки Sony WH-1000XM5    | Електроника   | 3      | 1,199.97    |
+| 4 | Велосипед Trek Mountain     | Спортни стоки | 1      | 899.00      |
+| 5 | Таблет Samsung Galaxy Tab   | Електроника   | 1      | 649.00      |
 
 ---
 
@@ -494,33 +565,38 @@ DELETE FROM product WHERE product_id = 31;
 
 ### 8.1 Индекси
 
-Създадени са **11 индекса** за оптимизация на заявките:
+Създадени са **14 индекса** за оптимизация на заявките:
 
-| Индекс               | Таблица | Колона        | Цел                               |
-|----------------------|---------|---------------|-----------------------------------|
-| PK индекси           | Всички  | *_id          | Бърз достъп по уникален ключ      |
-| idx_product_name     | PRODUCT | product_name  | Търсене по име на продукт         |
-| idx_product_price    | PRODUCT | price         | Търсене по ценови диапазон        |
-| idx_product_group    | PRODUCT | group_id      | Филтриране по група               |
-| idx_employee_name    | EMPLOYEE| employee_name | Търсене на служител               |
-| idx_client_name      | CLIENT  | client_name   | Търсене на клиент                 |
-| idx_sale_date        | SALE    | sale_date     | Филтриране по период              |
-| idx_sale_product     | SALE    | product_id    | JOIN оптимизация                  |
-| idx_sale_client      | SALE    | client_id     | JOIN оптимизация                  |
-| idx_sale_employee    | SALE    | employee_id   | JOIN оптимизация                  |
+| Индекс               | Таблица    | Колона        | Цел                               |
+|----------------------|------------|---------------|-----------------------------------|
+| PK индекси           | Всички     | *_id          | Бърз достъп по уникален ключ      |
+| idx_product_name     | PRODUCT    | product_name  | Търсене по име на продукт         |
+| idx_product_price    | PRODUCT    | price         | Търсене по ценови диапазон        |
+| idx_product_group    | PRODUCT    | group_id      | Филтриране по група               |
+| idx_employee_name    | EMPLOYEE   | employee_name | Търсене на служител               |
+| idx_employee_position| EMPLOYEE   | position_id   | Филтриране по позиция             |
+| idx_client_name      | CLIENT     | client_name   | Търсене на клиент                 |
+| idx_sale_date        | SALE       | sale_date     | Филтриране по период              |
+| idx_sale_client      | SALE       | client_id     | JOIN оптимизация                  |
+| idx_sale_employee    | SALE       | employee_id   | JOIN оптимизация                  |
+| idx_sale_item_sale   | SALE_ITEM  | sale_id       | JOIN оптимизация                  |
+| idx_sale_item_product| SALE_ITEM  | product_id    | JOIN оптимизация                  |
 
 ### 8.2 View оптимизация
 
-`v_sale_details` view съкращава сложни JOIN заявки:
+`v_sale_details` и `v_sale_summary` views съкращават сложни JOIN заявки:
 
 **Без view:**
 ```sql
-SELECT s.sale_id, p.product_name, pg.group_name, c.client_name, e.employee_name
+SELECT s.sale_id, p.product_name, pg.group_name, c.client_name, 
+       e.employee_name, pos.position_name, si.quantity, si.unit_price
 FROM sale s
-JOIN product p ON s.product_id = p.product_id
-JOIN product_group pg ON p.group_id = pg.group_id
 JOIN client c ON s.client_id = c.client_id
-JOIN employee e ON s.employee_id = e.employee_id;
+JOIN employee e ON s.employee_id = e.employee_id
+JOIN position pos ON e.position_id = pos.position_id
+JOIN sale_item si ON s.sale_id = si.sale_id
+JOIN product p ON si.product_id = p.product_id
+JOIN product_group pg ON p.group_id = pg.group_id;
 ```
 
 **С view:**
@@ -528,25 +604,16 @@ JOIN employee e ON s.employee_id = e.employee_id;
 SELECT * FROM v_sale_details;
 ```
 
-### 8.3 Производителност
+### 8.3 Референциална цялост
 
-**Типични времена за изпълнение (на малки обеми):**
-
-| Тип заявка                    | Време (ms) | Оптимизация          |
-|-------------------------------|------------|----------------------|
-| SELECT по PK                  | < 1        | Primary key index    |
-| SELECT по цена                | < 5        | idx_product_price    |
-| SELECT продажби за период     | < 10       | idx_sale_date        |
-| JOIN на 4 таблици             | < 15       | FK индекси           |
-| Агрегация по група            | < 20       | idx_product_group    |
-| Сложна справка с GROUP BY     | < 30       | Множество индекси    |
-
-### 8.4 Референциална цялост
-
-**ON DELETE RESTRICT** на всички foreign keys гарантира:
+**ON DELETE RESTRICT** на повечето foreign keys гарантира:
 - Не може да се изтрие продукт който има продажби
 - Не може да се изтрие клиент който има история на покупки
 - Не може да се изтрие служител който е обслужил продажби
 - Не може да се изтрие група докато има продукти в нея
+- Не може да се изтрие позиция докато има служители на тази позиция
+
+**ON DELETE CASCADE** на SALE_ITEM→SALE гарантира:
+- При изтриване на продажба, автоматично се изтриват всички артикули
 
 ---
