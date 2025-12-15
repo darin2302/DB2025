@@ -8,6 +8,7 @@ DROP TABLE IF EXISTS sale CASCADE;
 DROP TABLE IF EXISTS product CASCADE;
 DROP TABLE IF EXISTS product_group CASCADE;
 DROP TABLE IF EXISTS employee CASCADE;
+DROP TABLE IF EXISTS position CASCADE;
 DROP TABLE IF EXISTS client CASCADE;
 
 -- ============================================
@@ -50,27 +51,45 @@ COMMENT ON COLUMN product.group_id IS 'Връзка към групата на �
 COMMENT ON COLUMN product.price IS 'Текуща цена на продукта';
 
 -- ============================================
--- 3. ТАБЛИЦА: EMPLOYEE (Служител)
+-- 3. ТАБЛИЦА: POSITION (Позиция/Длъжност)
+-- ============================================
+CREATE TABLE position (
+    position_id NUMBER(10) PRIMARY KEY,
+    position_name VARCHAR2(100) NOT NULL UNIQUE
+);
+
+-- Коментари
+COMMENT ON TABLE position IS 'Длъжности на служителите (мениджър, продавач, касиер и т.н.)';
+COMMENT ON COLUMN position.position_id IS 'Уникален идентификатор на длъжността';
+COMMENT ON COLUMN position.position_name IS 'Наименование на длъжността';
+
+-- ============================================
+-- 4. ТАБЛИЦА: EMPLOYEE (Служител)
 -- ============================================
 CREATE TABLE employee (
     employee_id NUMBER(10) PRIMARY KEY,
     employee_name VARCHAR2(200) NOT NULL,
-    position VARCHAR2(100) NOT NULL,
-    phone VARCHAR2(20) NOT NULL
+    position_id NUMBER(10) NOT NULL,
+    phone VARCHAR2(20) NOT NULL,
+    CONSTRAINT fk_employee_position 
+        FOREIGN KEY (position_id) 
+        REFERENCES position(position_id)
+        ON DELETE RESTRICT
 );
 
--- Индекс за търсене по име
+-- Индекси за търсене
 CREATE INDEX idx_employee_name ON employee(employee_name);
+CREATE INDEX idx_employee_position ON employee(position_id);
 
 -- Коментари
 COMMENT ON TABLE employee IS 'Служители в магазина';
 COMMENT ON COLUMN employee.employee_id IS 'Уникален идентификатор на служителя';
 COMMENT ON COLUMN employee.employee_name IS 'Име на служителя';
-COMMENT ON COLUMN employee.position IS 'Позиция/Длъжност';
+COMMENT ON COLUMN employee.position_id IS 'Връзка към длъжността на служителя';
 COMMENT ON COLUMN employee.phone IS 'Телефон за връзка';
 
 -- ============================================
--- 4. ТАБЛИЦА: CLIENT (Клиент)
+-- 5. ТАБЛИЦА: CLIENT (Клиент)
 -- ============================================
 CREATE TABLE client (
     client_id NUMBER(10) PRIMARY KEY,
@@ -88,7 +107,7 @@ COMMENT ON COLUMN client.client_name IS 'Име на клиента';
 COMMENT ON COLUMN client.phone IS 'Телефон за връзка';
 
 -- ============================================
--- 5. ТАБЛИЦА: SALE (Продажба)
+-- 6. ТАБЛИЦА: SALE (Продажба)
 -- ============================================
 CREATE TABLE sale (
     sale_id NUMBER(10) PRIMARY KEY,
@@ -131,6 +150,7 @@ COMMENT ON COLUMN sale.sale_price IS 'Цена към момента на про
 -- ============================================
 CREATE SEQUENCE seq_product_group START WITH 1 INCREMENT BY 1;
 CREATE SEQUENCE seq_product START WITH 1 INCREMENT BY 1;
+CREATE SEQUENCE seq_position START WITH 1 INCREMENT BY 1;
 CREATE SEQUENCE seq_employee START WITH 1 INCREMENT BY 1;
 CREATE SEQUENCE seq_client START WITH 1 INCREMENT BY 1;
 CREATE SEQUENCE seq_sale START WITH 1 INCREMENT BY 1;
@@ -147,12 +167,13 @@ SELECT
     c.client_name,
     c.phone AS client_phone,
     e.employee_name,
-    e.position AS employee_position,
+    pos.position_name AS employee_position,
     s.sale_price
 FROM sale s
 JOIN product p ON s.product_id = p.product_id
 JOIN product_group pg ON p.group_id = pg.group_id
 JOIN client c ON s.client_id = c.client_id
-JOIN employee e ON s.employee_id = e.employee_id;
+JOIN employee e ON s.employee_id = e.employee_id
+JOIN position pos ON e.position_id = pos.position_id;
 
 COMMENT ON VIEW v_sale_details IS 'Детайлен изглед на всички продажби с пълна информация';
