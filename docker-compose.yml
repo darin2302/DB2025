@@ -1,0 +1,12 @@
+services:
+  oracle-db:
+    image: gvenzl/oracle-free:latest
+    container_name: shop-database
+    ports:
+      - "1521:1521"
+      - "5500:5500"
+    environment:
+      ORACLE_PASSWORD: ShopDB2025!
+
+volumes:
+  oracle-data:

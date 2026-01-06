@@ -7,18 +7,60 @@
 -- ЧАСТ 1: ВЪВЕЖДАНЕ И КОРЕКЦИИ НА ДАННИ
 -- ============================================
 
--- 1.1 Добавяне на нов продукт
+-- 0. Синхронизация на sequences с текущите данни (изпълнете само веднъж)
+-- Oracle не поддържа RESTART, затова използваме DROP и CREATE
+DECLARE
+   v_max_product_group NUMBER;
+   v_max_product NUMBER;
+   v_max_position NUMBER;
+   v_max_employee NUMBER;
+   v_max_client NUMBER;
+   v_max_sale NUMBER;
+   v_max_sale_item NUMBER;
+BEGIN
+   SELECT NVL(MAX(group_id), 0) + 1 INTO v_max_product_group FROM product_group;
+   SELECT NVL(MAX(product_id), 0) + 1 INTO v_max_product FROM product;
+   SELECT NVL(MAX(position_id), 0) + 1 INTO v_max_position FROM position;
+   SELECT NVL(MAX(employee_id), 0) + 1 INTO v_max_employee FROM employee;
+   SELECT NVL(MAX(client_id), 0) + 1 INTO v_max_client FROM client;
+   SELECT NVL(MAX(sale_id), 0) + 1 INTO v_max_sale FROM sale;
+   SELECT NVL(MAX(sale_item_id), 0) + 1 INTO v_max_sale_item FROM sale_item;
+   
+   EXECUTE IMMEDIATE 'DROP SEQUENCE seq_product_group';
+   EXECUTE IMMEDIATE 'CREATE SEQUENCE seq_product_group START WITH ' || v_max_product_group || ' INCREMENT BY 1';
+   
+   EXECUTE IMMEDIATE 'DROP SEQUENCE seq_product';
+   EXECUTE IMMEDIATE 'CREATE SEQUENCE seq_product START WITH ' || v_max_product || ' INCREMENT BY 1';
+   
+   EXECUTE IMMEDIATE 'DROP SEQUENCE seq_position';
+   EXECUTE IMMEDIATE 'CREATE SEQUENCE seq_position START WITH ' || v_max_position || ' INCREMENT BY 1';
+   
+   EXECUTE IMMEDIATE 'DROP SEQUENCE seq_employee';
+   EXECUTE IMMEDIATE 'CREATE SEQUENCE seq_employee START WITH ' || v_max_employee || ' INCREMENT BY 1';
+   
+   EXECUTE IMMEDIATE 'DROP SEQUENCE seq_client';
+   EXECUTE IMMEDIATE 'CREATE SEQUENCE seq_client START WITH ' || v_max_client || ' INCREMENT BY 1';
+   
+   EXECUTE IMMEDIATE 'DROP SEQUENCE seq_sale';
+   EXECUTE IMMEDIATE 'CREATE SEQUENCE seq_sale START WITH ' || v_max_sale || ' INCREMENT BY 1';
+   
+   EXECUTE IMMEDIATE 'DROP SEQUENCE seq_sale_item';
+   EXECUTE IMMEDIATE 'CREATE SEQUENCE seq_sale_item START WITH ' || v_max_sale_item || ' INCREMENT BY 1';
+END;
+/
+
+-- 1.1 Добавяне на нов продукт (използва sequence за автоматично ID)
 INSERT INTO product (product_id, product_name, group_id, price) 
-VALUES (31, 'Клавиатура Corsair K95', 1, 199.99);
+VALUES (seq_product.NEXTVAL, 'Клавиатура Corsair K95', 1, 199.99);
 
 -- 1.2 Корекция на цена на продукт
 UPDATE product 
 SET price = 2399.99 
 WHERE product_id = 1;
 
--- 1.3 Добавяне на нов клиент
+-- 1.3 Добавяне на нов клиент (използва sequence за автоматично ID)
 INSERT INTO client (client_id, client_name, phone) 
-VALUES (11, 'Иван Ангелов', '+359887111222');
+VALUES (seq_client.NEXTVAL, 'Иван Ангелов', '+359887111222');
 
 -- 1.4 Корекция на телефон на служител
 UPDATE employee 
@@ -336,7 +378,7 @@ SELECT
     p.price AS "Цена (лв)"
 FROM product p
 JOIN product_group pg ON p.group_id = pg.group_id
-WHERE p.product_id NOT IN (SELECT DISTINCT product_id FROM sale_item)
+WHERE NOT EXISTS (SELECT 1 FROM sale_item si WHERE si.product_id = p.product_id)
 ORDER BY pg.group_name, p.product_name;
 
 -- 6.6 Средна цена по група
